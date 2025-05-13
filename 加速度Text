@@ -1,0 +1,196 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class text2 : MonoBehaviour
+{
+    public Transform padA;
+
+    [Header("第一阶段（垂直运动）")]
+    public float ay1 = 0.1f; // 垂直加速度 (米/秒²)
+    public float moveTime1 = 2.0f;
+
+    [Header("第二阶段（斜向上运动）")]
+    public float az2 = -0.1f; // Z向加速度 (负表示向后)
+    public float ay2 = 0.2f;  // Y向加速度
+    public float moveTime2 = 2.0f;
+
+    [Header("第三阶段（斜向上运动）")]
+    public float az3 = 0.1f;
+    public float ay3 = 0.2f;
+    public float moveTime3 = 2.0f;
+
+    [Header("第四阶段（斜向下运动）")]
+    public float az4 = 0.1f;
+    public float ay4 = -0.2f; // 负表示向下
+    public float moveTime4 = 2.0f;
+
+    private enum MoveStage { Vertical, Diagonal1, Diagonal2, DiagonalDown, Done }
+    private MoveStage stage = MoveStage.Vertical;
+
+    private float time = 0f;
+    private Vector3 posAfterVertical;
+    private Vector3 posAfterDiagonal1;
+    private Vector3 posAfterDiagonal2;
+    private Vector3 posAfterDiagonalDown;
+
+    void Start()
+    {
+        posAfterVertical = GetTopCenter(padA);
+        transform.position = posAfterVertical;
+    }
+
+    void Update()
+    {
+        switch (stage)
+        {
+            case MoveStage.Vertical:
+                HandleVertical();
+                break;
+            case MoveStage.Diagonal1:
+                HandleDiagonal1();
+                break;
+            case MoveStage.Diagonal2:
+                HandleDiagonal2();
+                break;
+            case MoveStage.DiagonalDown:
+                HandleDiagonalDown();
+                break;
+        }
+    }
+
+    //第一段运动
+    void HandleVertical()
+    {
+        time += Time.deltaTime;
+        float halfTime = moveTime1 / 2f;
+        //float totalDisplacement = 0.5f * ay1 * moveTime1 * moveTime1 / 2f; // 一半位移
+        //float a = 4 * totalDisplacement / (moveTime1 * moveTime1);         // 推导自 s = 1/2 a t^2
+
+        if (time <= halfTime)
+        {
+            // 加速段
+            float dy = 0.5f * ay1 * time * time;
+            transform.position = posAfterVertical + new Vector3(0, dy, 0);
+        }
+        else if (time <= moveTime1)
+        {
+            // 减速段
+            float t = time - halfTime;
+            float vmax = ay1 * halfTime;
+            float dy = (0.5f * ay1 * halfTime * halfTime) + (vmax * t - 0.5f * ay1 * t * t);
+            transform.position = posAfterVertical + new Vector3(0, dy, 0);
+        }
+        else
+        {
+            //transform.position = posAfterVertical + new Vector3(0, 2 * totalDisplacement, 0);
+            posAfterDiagonal1 = transform.position;
+            time = 0f;
+            stage = MoveStage.Diagonal1;
+        }
+    }
+
+    //第二段运动
+    void HandleDiagonal1()
+    {
+        time += Time.deltaTime;
+        float halfTime = moveTime2 / 2f;
+
+        if (time <= halfTime)
+        {
+            float dy = 0.5f * ay2 * time * time;
+            float dz = 0.5f * az2 * time * time;
+            transform.position = posAfterDiagonal1 + new Vector3(0, dy, -dz);
+        }
+        else if (time <= moveTime2)
+        {
+            float t = time - halfTime;
+            float vmaxY = ay2 * halfTime;
+            float vmaxZ = az2 * halfTime;
+
+            float dy = (0.5f * ay2 * halfTime * halfTime) + (vmaxY * t - 0.5f * ay2 * t * t);
+            float dz = (0.5f * az2 * halfTime * halfTime) + (vmaxZ * t - 0.5f * az2 * t * t);
+
+            transform.position = posAfterDiagonal1 + new Vector3(0, dy, -dz);
+        }
+        else
+        {
+            posAfterDiagonal2 = transform.position;
+            time = 0f;
+            stage = MoveStage.Diagonal2;
+        }
+    }
+
+    //第三段运动
+    void HandleDiagonal2()
+    {
+        time += Time.deltaTime;
+        float halfTime = moveTime3 / 2f;
+        if (time <= halfTime)
+        {
+            float dz = 0.5f * az3 * time * time;
+            float dy = 0.5f * ay3 * time * time;
+            transform.position = posAfterDiagonal2 + new Vector3(0, dy, dz);
+        }
+        else if (time <= moveTime3)
+        {
+            float t = time - halfTime;
+            float vmaxY = ay3 * halfTime;
+            float vmaxZ = az3 * halfTime;
+
+            float dy = (0.5f * ay3 * halfTime * halfTime) + (vmaxY * t - 0.5f * ay3 * t * t);
+            float dz = (0.5f * az3 * halfTime * halfTime) + (vmaxZ * t - 0.5f * az3 * t * t);
+
+            transform.position = posAfterDiagonal2 + new Vector3(0, dy, dz);
+        }
+        else
+        {
+            posAfterDiagonalDown = transform.position;
+            time = 0f;
+            stage = MoveStage.DiagonalDown;
+        }
+    }
+
+    //第四段运动
+    void HandleDiagonalDown()
+    {
+        time += Time.deltaTime;
+        float halfTime = moveTime4 / 2f;
+        if (time <= halfTime)
+        {
+            float dy = 0.5f * ay4 * time * time;
+            float dz = 0.5f * az4 * time * time;
+            transform.position = posAfterDiagonalDown + new Vector3(0, -dy, dz);
+        }
+        else if (time <= moveTime4)
+        {
+            float t = time - halfTime;
+            float vmaxY = ay4 * halfTime;
+            float vmaxZ = az4 * halfTime;
+
+            float dy = (0.5f * ay4 * halfTime * halfTime) + (vmaxY * t - 0.5f * ay4 * t * t);
+            float dz = (0.5f * az4 * halfTime * halfTime) + (vmaxZ * t - 0.5f * az4 * t * t);
+
+            transform.position = posAfterDiagonalDown + new Vector3(0, -dy, dz);
+        }
+        else
+        {
+            stage = MoveStage.Done;
+        }
+    }
+
+    //获取焊台中心点坐标
+    private Vector3 GetTopCenter(Transform obj)
+    {
+        // 获取物体的 Renderer 组件
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            // 获取物体的边界框
+            Bounds bounds = renderer.bounds;
+            // 计算顶面中心点的位置 
+            return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+        }
+        return obj.position;
+    }
+}
