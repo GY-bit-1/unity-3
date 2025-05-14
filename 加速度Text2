@@ -1,0 +1,127 @@
+using UnityEngine;
+
+public class Text2 : MonoBehaviour
+{
+    public Transform padA;
+
+    [Header("第一阶段（垂直上升）")]
+    public float moveTime1 = 2.0f;
+    public float dy1 = 0.2f; // 垂直位移
+
+    [Header("第二阶段（斜向上）")]
+    public float moveTime2 = 2.0f;
+    public float dy2 = 0.2f;
+    public float dz2 = -0.3f;
+
+    [Header("第三阶段（斜向上）")]
+    public float moveTime3 = 2.0f;
+    public float dy3 = 0.2f;
+    public float dz3 = 0.3f;
+
+    [Header("第四阶段（斜向下）")]
+    public float moveTime4 = 2.0f;
+    public float dy4 = -0.2f;
+    public float dz4 = 0.3f;
+
+    private enum MoveStage { Vertical, Diagonal1, Diagonal2, DiagonalDown, Done }
+    private MoveStage stage = MoveStage.Vertical;
+
+    private float time = 0f;
+
+    // 每段运动的起始位置
+    private Vector3 posStart;
+
+    // 每段的加速度
+    private float ay1, ay2, ay3, ay4;
+    private float az2, az3, az4;
+
+    void Start()
+    {
+        posStart = GetTopCenter(padA);
+
+        // 预计算各段加速度（a = 4s / t²）
+        //第一段
+        ay1 = 4f * dy1 / (moveTime1 * moveTime1);
+
+        //第二段
+        ay2 = 4f * dy2 / (moveTime2 * moveTime2);
+        az2 = 4f * dz2 / (moveTime2 * moveTime2);
+
+        //第三段
+        ay3 = 4f * dy3 / (moveTime3 * moveTime3);
+        az3 = 4f * dz3 / (moveTime3 * moveTime3);
+
+        //第四段
+        ay4 = 4f * dy4 / (moveTime4 * moveTime4);
+        az4 = 4f * dz4 / (moveTime4 * moveTime4);
+    }
+
+    void Update()
+    {
+        switch (stage)
+        {
+            case MoveStage.Vertical:
+                HandleMovement(dy1, 0f, moveTime1, ay1, 0f, MoveStage.Diagonal1);
+                break;
+            case MoveStage.Diagonal1:
+                HandleMovement(dy2, dz2, moveTime2, ay2, az2, MoveStage.Diagonal2);
+                break;
+            case MoveStage.Diagonal2:
+                HandleMovement(dy3, dz3, moveTime3, ay3, az3, MoveStage.DiagonalDown);
+                break;
+            case MoveStage.DiagonalDown:
+                HandleMovement(dy4, dz4, moveTime4, ay4, az4, MoveStage.Done);
+                break;
+        }
+    }
+
+    void HandleMovement(float totalDY, float totalDZ, float totalTime, float aY, float aZ, MoveStage nextStage)
+    {
+        time += Time.deltaTime;
+        float halfTime = totalTime / 2f;
+        float dy = 0f, dz = 0f;
+
+        if (time <= halfTime)
+        {
+            dy = 0.5f * aY * time * time;
+            dz = 0.5f * aZ * time * time;
+        }
+        else if (time <= totalTime)
+        {
+            float t = time - halfTime;
+            float vMaxY = aY * halfTime;
+            float vMaxZ = aZ * halfTime;
+
+            dy = 0.5f * aY * halfTime * halfTime + vMaxY * t - 0.5f * aY * t * t;
+            dz = 0.5f * aZ * halfTime * halfTime + vMaxZ * t - 0.5f * aZ * t * t;
+        }
+        else
+        {
+            // 补上最终精确位置，准备进入下一阶段
+            dy = totalDY;
+            dz = totalDZ;
+
+            time = 0f;
+            posStart = posStart + new Vector3(0, dy, dz);
+            stage = nextStage;
+
+            //Debug.Log($"{nextStage} 开始，当前位置：{transform.position}");
+            return;
+        }
+
+        transform.position = posStart + new Vector3(0, dy, dz);
+        Debug.Log("实时位置" + transform.position);
+    }
+
+    // 获取焊盘顶部中心位置
+    private Vector3 GetTopCenter(Transform obj)
+    {
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Bounds bounds = renderer.bounds;
+            return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+        }
+        return obj.position;
+    }
+}
