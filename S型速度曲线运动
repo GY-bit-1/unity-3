@@ -1,0 +1,97 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class text21 : MonoBehaviour
+{
+    public Transform padA;
+
+    [Header("阶段 1（垂直）")]
+    public float dy1 = 0.1f;
+    public float moveTime1 = 2.0f;
+
+    [Header("阶段 2（斜上）")]
+    public float dy2 = 0.2f;
+    public float dz2 = -0.3f;
+    public float moveTime2 = 2.0f;
+
+    [Header("阶段 3（斜上）")]
+    public float dy3 = 0.15f;
+    public float dz3 = 0.2f;
+    public float moveTime3 = 2.0f;
+
+    [Header("阶段 4（继续斜下）")]
+    public float dy4 = -0.2f;
+    public float dz4 = 0.3f;
+    public float moveTime4 = 2.0f;
+
+    private enum MoveStage { Vertical, Diagonal1, Diagonal2, Diagonal3, Done }
+    private MoveStage stage = MoveStage.Vertical;
+
+    private float time = 0f;
+    private Vector3 currentStartPos;
+
+    void Start()
+    {
+        currentStartPos = GetTopCenter(padA);
+        transform.position = currentStartPos;
+    }
+
+    void Update()
+    {
+        switch (stage)
+        {
+            case MoveStage.Vertical:
+                HandleSMove(dy1, 0f, moveTime1, MoveStage.Diagonal1);
+                break;
+
+            case MoveStage.Diagonal1:
+                HandleSMove(dy2, dz2, moveTime2, MoveStage.Diagonal2);
+                break;
+
+            case MoveStage.Diagonal2:
+                HandleSMove(dy3, dz3, moveTime3, MoveStage.Diagonal3);
+                break;
+
+            case MoveStage.Diagonal3:
+                HandleSMove(dy4, dz4, moveTime4, MoveStage.Done);
+                break;
+
+            case MoveStage.Done:
+                // 运动结束
+                break;
+        }
+    }
+
+    void HandleSMove(float dy, float dz, float totalTime, MoveStage nextStage)
+    {
+        //time 是一个类成员变量，记录从移动开始累计的时间
+        time += Time.deltaTime;
+        //t 确保时间不会超过设定的 totalTime，防止过度计算
+        float t = Mathf.Min(time, totalTime);
+        //progress 是归一化的进度值(0 - 1)，使用余弦函数实现缓入缓出效果（开始和结束时速度较慢，中间速度较快）
+        float progress = 0.5f * (1 - Mathf.Cos(Mathf.PI * t / totalTime));
+
+        Vector3 offset = new Vector3(0, dy * progress, dz * progress);
+        transform.position = currentStartPos + offset;
+
+        //更改状态使运动进入下一阶段
+        if (time >= totalTime)
+        {
+            time = 0f;
+            currentStartPos = transform.position;
+            stage = nextStage;
+        }
+    }
+
+    Vector3 GetTopCenter(Transform obj)
+    {
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Bounds bounds = renderer.bounds;
+            return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+        }
+        return obj.position;
+    }
+}
