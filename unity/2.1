@@ -1,0 +1,219 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using Obi;
+using System.Net.Mail;
+using System.Linq;
+
+public class text21 : MonoBehaviour
+{
+    public clampRing clampRing;
+    public Transform padA;
+    public Transform pip;
+    public Transform PipDown;
+    public Transform Tours;
+    public ObiRopeCursor ropeCursor;
+    public zhuanhuan1 zhuanhuan1;
+
+    [Header("阶段0（任意）")]
+    public float moveToStartTime = 1.5f;
+
+    [Header("阶段 1（垂直）")]
+    public float dy1 = 0.1f;
+    public float moveTime1 = 2.0f;
+
+    [Header("阶段 2（斜上）")]
+    public float dy2 = 0.2f;
+    public float dz2 = -0.3f;
+    public float moveTime2 = 2.0f;
+
+    [Header("阶段 3（斜上）")]
+    public float dy3 = 0.15f;
+    public float dz3 = 0.2f;
+    public float moveTime3 = 2.0f;
+
+    [Header("阶段 4（继续斜下）")]
+    public float dy4 = -0.2f;
+    public float dz4 = 0.3f;
+    public float moveTime4 = 2.0f;
+
+    [Header("阶段5（垂直）")]
+    public float dy5 = 0.1f;
+    public float moveTime5 = 2.0f;
+
+    [Header("振动阶段设置")]
+    public float vibrateDuration = 1.0f;        // 振动总时间
+    public float vibrateAmplitude = 0.01f;      // 振动幅度（左右位移）
+    public float vibrateFrequency = 20.0f;      // 振动频率（Hz）
+
+    private enum MoveStage { MoveToStart, Vertical, Vibrate1, Diagonal1, Diagonal2, Diagonal3, Vibrat2, Diagonal4,Done }
+    private MoveStage stage = MoveStage.Vertical;
+
+    private Vector3 startPos;
+    private Vector3 targetStartPos;
+    private float time = 0f;
+    private Vector3 currentStartPos;
+    private Vector3 vibrateBasePos;             // 振动基准位置
+
+
+    //绳索控制长度
+    private float initialLength;                // 初始绳索长度
+    private Vector3 lastPipPosition;            // 焊头的上一帧位置
+    private float currentRopeLength;            // 当前绳索长度
+    void Start()
+    {
+        //当前起始位置
+        startPos = transform.position;
+        //目标起始点为焊台A的中心点
+        targetStartPos = GetTopCenter(padA);
+
+        stage = MoveStage.MoveToStart;
+        //transform.position = currentStartPos;
+    }
+
+    void Update()
+    {
+        // 更新绳索长度（如果线夹打开）
+        UpdateRopeLength();
+
+        switch (stage)
+        {
+            case MoveStage.MoveToStart:
+                time += Time.deltaTime;
+                float tStart = Mathf.Clamp01(time / moveToStartTime);
+                transform.position = Vector3.Lerp(startPos, targetStartPos, tStart);
+                if (tStart >= 1f)
+                {
+                    currentStartPos = transform.position;
+                    time = 0f;
+                    stage = MoveStage.Vibrate1;
+                }
+                break;
+
+            case MoveStage.Vibrate1:
+                HandleVibrateMove(MoveStage.Vertical);
+
+                zhuanhuan1.SnapToPad();
+            break;
+
+            case MoveStage.Vertical:
+
+                if (time == 0 && clampRing != null)
+                {
+                    clampRing.OpenClamp();
+                }
+
+                HandleSMove(dy1, 0f, moveTime1, MoveStage.Diagonal1);
+                break;
+
+            case MoveStage.Diagonal1:
+                HandleSMove(dy2, dz2, moveTime2, MoveStage.Diagonal2);
+                break;
+
+            case MoveStage.Diagonal2:
+                HandleSMove(dy3, dz3, moveTime3, MoveStage.Diagonal3);
+                break;
+
+            case MoveStage.Diagonal3:
+                if (time == 0 && clampRing != null)
+                {
+                    clampRing.CloseClamp();
+                }
+                HandleSMove(dy4, dz4, moveTime4, MoveStage.Vibrat2);
+                break;
+
+            case MoveStage.Vibrat2:
+                HandleVibrateMove(MoveStage.Diagonal4);
+                break;
+
+            case MoveStage.Diagonal4:
+                if (time == 0 && clampRing != null)
+                {
+                    clampRing.OpenClamp();
+                }
+                HandleSMove(dy5, 0, moveTime5, MoveStage.Done);
+                break;
+
+            case MoveStage.Done:
+                if (time == 0 && clampRing != null)
+                {
+                    clampRing.CloseClamp();
+                }
+                // 运动结束
+                break;
+        }
+    }
+
+    private void UpdateRopeLength()
+    {
+        // 检查线夹是否打开且所有必要组件已设置
+        if ((clampRing == null || clampRing.IsOpen()) && PipDown != null && ropeCursor != null)
+        {
+            Vector3 currentPosition = PipDown.position;
+            float movementDistance = Vector3.Distance(currentPosition, lastPipPosition);
+
+            if (movementDistance > 0)
+            {
+                // 增加绳索长度
+                currentRopeLength += movementDistance;
+                ropeCursor.ChangeLength(currentRopeLength); //改变绳索长度函数 ChangeLength()
+                Debug.Log($"[text21] 增加绳索长度: {movementDistance}, 总长度: {currentRopeLength}");
+            }
+
+            lastPipPosition = currentPosition;
+        }
+    }
+
+    //运动函数
+    void HandleSMove(float dy, float dz, float totalTime, MoveStage nextStage)
+    {
+        //time 是一个类成员变量，记录从移动开始累计的时间
+        time += Time.deltaTime;
+        //t 确保时间不会超过设定的 totalTime，防止过度计算
+        float t = Mathf.Min(time, totalTime);
+        //progress 是归一化的进度值(0 - 1)，使用余弦函数实现缓入缓出效果（开始和结束时速度较慢，中间速度较快）
+        float progress = 0.5f * (1 - Mathf.Cos(Mathf.PI * t / totalTime));
+
+        Vector3 offset = new Vector3(0, dy * progress, dz * progress);
+        transform.position = currentStartPos + offset;
+
+        //更改状态使运动进入下一阶段
+        if (time >= totalTime)
+        {
+            time = 0f;
+            currentStartPos = transform.position;
+            stage = nextStage;
+        }
+    }
+
+    //振动阶段
+    void HandleVibrateMove(MoveStage nextStage)
+    {
+        if (time == 0f)
+            vibrateBasePos = transform.position;
+
+        time += Time.deltaTime;
+        float offsetX = vibrateAmplitude * Mathf.Sin(2 * Mathf.PI * vibrateFrequency * time);
+        transform.position = vibrateBasePos + new Vector3(offsetX, 0, 0);
+
+        if (time >= vibrateDuration)
+        {
+            time = 0f;
+            currentStartPos = transform.position;
+            stage = nextStage;
+        }
+    }
+
+    //中心焊点的确定
+    Vector3 GetTopCenter(Transform obj)
+    {
+        Renderer renderer = obj.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Bounds bounds = renderer.bounds;
+            return new Vector3(bounds.center.x, bounds.max.y, bounds.center.z);
+        }
+        return obj.position;
+    }
+}
