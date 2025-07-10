@@ -1,0 +1,127 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using Obi;
+using UnityEngine.ProBuilder.Shapes;
+using System.Net.Mail;
+using static UnityEngine.GraphicsBuffer;
+using System.Linq;
+
+public class zhuanhuan1 : MonoBehaviour
+{
+    public Transform pipdown;
+    public Transform padA;
+    public ObiRope rope;
+    public int targetParticleIndex = 0;
+    public int newParticleIndex;
+    private ObiActor actor;
+    private float initialLength;
+    // Start is called before the first frame update
+    void Start()
+    {
+        actor = GetComponent<ObiActor>();
+
+        // 保证等 Blueprint 加载后再换绑
+        actor.OnBlueprintLoaded += (a, blueprint) =>
+        {
+            Debug.Log("[SnapAttachment] Blueprint loaded.");
+        };
+    }
+
+    // Update is called once per frame
+    public void SnapToPad()
+    {
+        if (pipdown == null || padA == null || !actor.isLoaded)
+        {
+            Debug.LogError("[SnapAttachment] 必要对象未设置或 ObiActor 未加载完成。");
+            return;
+        }
+
+        // 遍历所有 attachment
+        ObiParticleAttachment[] attachments = GetComponents<ObiParticleAttachment>();
+        ObiParticleAttachment targetAttachment = null;
+
+        foreach (var att in attachments)
+        {
+            if (att.target == pipdown)
+            {
+                targetAttachment = att;
+                break;
+            }
+        }
+
+        if (targetAttachment == null)
+        {
+            Debug.LogWarning("[SnapAttachment] 没有找到绑定 pip 的 attachment。");
+
+            return;
+        }
+
+        //粒子索引校验
+        if (targetParticleIndex >= targetAttachment.particleGroup.particleIndices.Count)
+        {
+            Debug.LogError("[SnapAttachment] 指定粒子索引超出范围。");
+
+            return;
+        }
+
+        ////执行换绑操作
+        //targetAttachment.enabled = false;
+        //targetAttachment.target = null;
+
+
+        //int particleIndex = targetAttachment.particleGroup.particleIndices[targetParticleIndex];
+        //int solverIndex = actor.solverIndices[particleIndex];
+
+
+        //// 将粒子位置对齐 padA
+        //Vector3 snapPos = actor.solver.transform.InverseTransformPoint(padA.position);
+        //actor.solver.positions[solverIndex] = snapPos;
+
+        //// 重新绑定目标
+        //targetAttachment.target = padA;
+        //targetAttachment.enabled = true;
+
+        targetAttachment.target = padA;
+
+        Debug.Log($"[SnapAttachment] 成功将 Attachment 从 {pipdown.name} 换绑到 {padA.name}。");
+    }
+
+    public void CreatNewAttachMent()
+    {
+        
+    }
+
+    //public void CreateAndBindParticleAttachment()
+    //{
+    //    if (rope == null || pipdown == null)
+    //    {
+    //        Debug.LogError("ObiRope或pipdown未赋值，请检查Inspector设置");
+    //        return;
+    //    }
+
+    //    // 创建新的ObiParticleAttachment组件
+    //    ObiParticleAttachment particleAttachment = gameObject.AddComponent<ObiParticleAttachment>();
+
+    //    // 配置绑定参数 - Obi 7.0.5使用AttachmentMode
+    //    particleAttachment.target = pipdown;
+
+    //    // 使用Obi 7.x的方式设置actor
+    //    particleAttachment.actor = rope;
+
+    //    // 获取粒子索引 (point2对应索引1)
+    //    int particleIndex = 1;
+
+    //    // 创建并配置粒子组 - Obi 7.x使用List<int>
+    //    ObiParticleGroup particleGroup = rope.gameObject.AddComponent<ObiParticleGroup>();
+    //    particleGroup.particleIndices = new List<int> { particleIndex };
+
+    //    // 设置要绑定的粒子组
+    //    particleAttachment.particleGroup = particleGroup;
+
+    //    // 启用绑定
+    //    particleAttachment.enabled = true;
+
+    //    Debug.Log($"成功将point2绑定到{pipdown.name}");
+    //}
+}
